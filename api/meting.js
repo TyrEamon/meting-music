@@ -15,6 +15,11 @@ function toHttps(url) {
   return typeof url === "string" ? url.replace(/^http:\/\//, "https://") : "";
 }
 
+function fallbackAudioUrl(server, songId) {
+  if (server !== "netease" || !songId) return "";
+  return `https://music.163.com/song/media/outer/url?id=${encodeURIComponent(songId)}.mp3`;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -67,7 +72,7 @@ export default async function handler(req, res) {
           title: song.name || song.title || "",
           author: artist,
           album: song.album || "",
-          url: toHttps(url.url || song.url || ""),
+          url: toHttps(url.url || song.url || "") || fallbackAudioUrl(server, songId),
           pic: toHttps(pic.url || song.pic || ""),
           lrc: lyric.lyric || lyric.lrc || lyric.tlyric || "",
           tlyric: lyric.tlyric || "",
