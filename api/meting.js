@@ -15,16 +15,44 @@ function toHttps(url) {
   return typeof url === "string" ? url.replace(/^http:\/\//, "https://") : "";
 }
 
-function fallbackAudioUrl(server, songId) {
+function outerAudioUrl(server, songId) {
   if (server !== "netease" || !songId) return "";
   return `https://music.163.com/song/media/outer/url?id=${encodeURIComponent(songId)}.mp3`;
+}
+
+async function resolveAudioUrl(server, songId, currentUrl) {
+  const normalizedCurrent = toHttps(currentUrl || "");
+  if (normalizedCurrent) return normalizedCurrent;
+
+  const outerUrl = outerAudioUrl(server, songId);
+  if (!outerUrl) return "";
+
+  try {
+    const response = await fetch(outerUrl, {
+      method: "HEAD",
+      redirect: "manual",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36",
+        Referer: "https://music.163.com/",
+      },
+    });
+    const location = response.headers.get("location") || "";
+    if (location && !location.includes("/404")) {
+      return toHttps(new URL(location, outerUrl).toString());
+    }
+  } catch {
+    // Fall back to the stable outer URL if the service cannot expose the redirect.
+  }
+
+  return outerUrl;
 }
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=604800");
+  res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -72,7 +100,7 @@ export default async function handler(req, res) {
           title: song.name || song.title || "",
           author: artist,
           album: song.album || "",
-          url: toHttps(url.url || song.url || "") || fallbackAudioUrl(server, songId),
+          url: await resolveAudioUrl(server, songId, url.url || song.url || ""),
           pic: toHttps(pic.url || song.pic || ""),
           lrc: lyric.lyric || lyric.lrc || lyric.tlyric || "",
           tlyric: lyric.tlyric || "",
