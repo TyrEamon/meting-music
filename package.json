@@ -1,4 +1,4 @@
-{
+﻿{
   "type": "module",
   "dependencies": {
     "@meting/core": "latest"
